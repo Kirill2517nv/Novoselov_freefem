@@ -1,0 +1,89 @@
+real xMin = -10.0;
+real xMax = 10.0;
+real yMin = -5.0;
+real yMax = 5.0;
+
+real xMidLeft = -5.0;
+real xMidRight = 5;
+real xMid = 0;
+real yMid = 0;
+
+
+int LabelLT1 = 1;
+int LabelLT2 = 2;
+int LabelRT1 = 3;
+int LabelRT2 = 4;
+int LabelLB1 = 5;
+int LabelLB2 = 6;
+int LabelRB1 = 7;
+int LabelRB2 = 8;
+int LabelOut = 9;
+
+int Nin = 10; 
+int Nout = 100;
+
+border GammaLT1( t = 0.0, 1) {
+    x = xMin +(xMidLeft-xMin)*t;
+    y = x +10;
+    label = LabelLT1;
+}
+
+border GammaLT2( t = 0.0, 1) {
+    x = xMidLeft +(xMid-xMidLeft)*t;
+    y = 0.48*x^2 + 2.4*x +5;
+    label = LabelLT2;
+}
+
+border GammaRT1( t = 0.0, 1) {
+    x = xMid +(xMidRight-xMid)*t;
+    y = 0.48*x^2 - 2.4*x + 5;
+    label = LabelRT1;
+}
+
+border GammaRT2( t = 0.0, 1) {
+    x = xMidRight +(xMax-xMidRight)*t;
+    y = 10 -x;
+    label = LabelRT2;
+}
+
+border GammaLB1( t = 0.0, 1) {
+    x = xMidLeft +(xMin -xMidLeft)*t;
+    y = -x - 10;
+    label = LabelLB1;
+}
+
+border GammaLB2( t = 0.0, 1) {
+    x = xMid +(xMidLeft - xMid)*t;
+    y = -0.48*x^2 - 2.4*x - 5;
+    label = LabelLB2;
+}
+
+border GammaRB1( t = 0.0, 1) {
+    x = xMidRight +(xMid - xMidRight)*t;
+    y = -0.48*x^2 + 2.4*x - 5;
+    label = LabelRB1;
+}
+
+border GammaRB2( t = 0.0, 1) {
+    x = xMax +(xMidRight - xMax)*t;
+    y = x - 10;
+    label = LabelRB2;
+}
+
+border GammaOut( t = 0.0, 2*pi) {
+    x = 13 * cos(t);
+    y = 10 * sin(t);
+    label = LabelOut;
+}
+
+
+plot(GammaLT1(Nin) + GammaLT2(Nin) + GammaRT1(Nin) + GammaRT2(Nin) +
+     GammaLB1(Nin) + GammaLB2(Nin) + GammaRB1(Nin) + GammaRB2(Nin) +
+     GammaOut(Nout));
+
+
+mesh Th = buildmesh(GammaLT1(Nin) + GammaLT2(Nin) + GammaRT1(Nin) + GammaRT2(Nin) +
+                    GammaLB1(Nin) + GammaLB2(Nin) + GammaRB1(Nin) + GammaRB2(Nin) +
+                    GammaOut(Nout));
+
+plot(Th);
