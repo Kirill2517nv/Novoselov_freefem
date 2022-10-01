@@ -19,27 +19,26 @@ int LabelRB1 = 7;
 int LabelRB2 = 8;
 int LabelOut = 9;
 
-int NN = 10;
+int NN = 50;
 int Nin = NN; 
 int Nout = NN * 8;
 
 
-real uOut = sin(1.0);
 
-func uExactFunc = sin(x*x / 160.0 + y*y / 100.0);
-func f = (x*x / 6400.0 + y*y / 2500.0) * sin(x*x / 160.0 + y*y / 100.0);
+func uExactFunc = sin(x*x + y*y);
+func f = (4*x*x + 4*y*y) * sin(x*x + y*y) - 4 * cos(x*x + y*y);
 
 
 
 border GammaLT1( t = 0.0, 1) {
     x = xMin +(xMidLeft-xMin)*t;
-    y = x +10;
+    y = x + 10;
     label = LabelLT1;
 }
 
 border GammaLT2( t = 0.0, 1) {
     x = xMidLeft +(xMid-xMidLeft)*t;
-    y = 0.48*x^2 + 2.4*x +5;
+    y = 0.48*x^2 + 2.4*x + 5;
     label = LabelLT2;
 }
 
@@ -51,7 +50,7 @@ border GammaRT1( t = 0.0, 1) {
 
 border GammaRT2( t = 0.0, 1) {
     x = xMidRight +(xMax-xMidRight)*t;
-    y = 10 -x;
+    y = 10 - x;
     label = LabelRT2;
 }
 
@@ -80,8 +79,8 @@ border GammaRB2( t = 0.0, 1) {
 }
 
 border GammaOut( t = 0.0, 2*pi) {
-    x = 13 * cos(t);
-    y = 10 * sin(t);
+    x = 11 * cos(t);
+    y = 8 * sin(t);
     label = LabelOut;
 }
 
@@ -103,6 +102,7 @@ Vh h = hTriangle;
 
 Vh u,v;
 Vh uExact = uExactFunc; 
+Vh ff = f;
 
 
 varf LaplaceBilinearForm (u,v) = 
@@ -114,19 +114,20 @@ varf LaplaceBilinearForm (u,v) =
 
 /* Linear form defenition for rhs */
 
+func g = dx(uExact) * N.x + dy(uExact) * N.y;
 
 varf RhsLinearForm(u,v) = 
     int2d(Th)(
-        (-f) * v
+        (-ff) * v
     )
-    + int1d(Th, LabelLT1)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
-    + int1d(Th, LabelLT2)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
-    + int1d(Th, LabelRT1)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
-    + int1d(Th, LabelRT2)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
-    + int1d(Th, LabelLB1)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
-    + int1d(Th, LabelLB2)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
-    + int1d(Th, LabelRB1)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
-    + int1d(Th, LabelRB2)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + int1d(Th, LabelLT1)( g * v)
+    + int1d(Th, LabelLT2)( g * v)
+    + int1d(Th, LabelRT1)( g * v)
+    + int1d(Th, LabelRT2)( g * v)
+    + int1d(Th, LabelLB1)( g * v)
+    + int1d(Th, LabelLB2)( g * v)
+    + int1d(Th, LabelRB1)( g * v)
+    + int1d(Th, LabelRB2)( g * v)
     + on(LabelOut, u = uExact)
     ;
 
@@ -137,12 +138,13 @@ u[] = A^-1*b;
 
 string plotTitle = "Laplace Solution";
 
-plot (Th, u, fill = true, dim = 2, value = 1, nbiso = 100, cmm = plotTitle);
+plot(Th, u, fill = true, dim = 2, value = 1, nbiso = 10, cmm = plotTitle);
+plot(Th, uExact, fill = true, dim = 2, value = 1, nbiso = 10);
 
 
-Vh uErrorAbs = abs(u - uExact);
+Vh uErrorAbs = abs((u - uExact) / uExact);
 
-plot(Th, uErrorAbs, fill=true, dim = 3);
+plot(Th, uErrorAbs, fill=true, dim = 3, value = 1, nbiso = 10);
 
 /* Error in L2 norm calculation*/
 real uErorL2Norm = sqrt( int2d(Th)(uErrorAbs^2));
@@ -152,6 +154,5 @@ real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
 
 
 cout << "size of mesh = " << h[].max << endl;
-cout << "||uExact||_L2 " << uExactL2Norm << endl;
 cout << "||uEror||_L2 " << uErorL2Norm << endl;
 cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl;
