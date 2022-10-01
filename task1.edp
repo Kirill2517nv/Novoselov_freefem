@@ -19,8 +19,17 @@ int LabelRB1 = 7;
 int LabelRB2 = 8;
 int LabelOut = 9;
 
-int Nin = 10; 
-int Nout = 100;
+int NN = 10;
+int Nin = NN; 
+int Nout = NN * 8;
+
+
+real uOut = sin(1.0);
+
+func uExactFunc = sin(x*x / 160.0 + y*y / 100.0);
+func f = (x*x / 6400.0 + y*y / 2500.0) * sin(x*x / 160.0 + y*y / 100.0);
+
+
 
 border GammaLT1( t = 0.0, 1) {
     x = xMin +(xMidLeft-xMin)*t;
@@ -87,3 +96,62 @@ mesh Th = buildmesh(GammaLT1(Nin) + GammaLT2(Nin) + GammaRT1(Nin) + GammaRT2(Nin
                     GammaOut(Nout));
 
 plot(Th);
+
+fespace Vh(Th, P1); 
+
+Vh h = hTriangle;
+
+Vh u,v;
+Vh uExact = uExactFunc; 
+
+
+varf LaplaceBilinearForm (u,v) = 
+    int2d(Th)(
+        dx(u)*dx(v) + dy(u)*dy(v)
+    )
+    + on(LabelOut, u = uExact)
+    ;
+
+/* Linear form defenition for rhs */
+
+
+varf RhsLinearForm(u,v) = 
+    int2d(Th)(
+        (-f) * v
+    )
+    + int1d(Th, LabelLT1)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + int1d(Th, LabelLT2)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + int1d(Th, LabelRT1)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + int1d(Th, LabelRT2)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + int1d(Th, LabelLB1)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + int1d(Th, LabelLB2)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + int1d(Th, LabelRB1)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + int1d(Th, LabelRB2)( (dx(uExact) * N.x + dy(uExact) * N.y) * v)
+    + on(LabelOut, u = uExact)
+    ;
+
+matrix A = LaplaceBilinearForm(Vh, Vh);
+real[int] b = RhsLinearForm(0, Vh);
+
+u[] = A^-1*b; 
+
+string plotTitle = "Laplace Solution";
+
+plot (Th, u, fill = true, dim = 2, value = 1, nbiso = 100, cmm = plotTitle);
+
+
+Vh uErrorAbs = abs(u - uExact);
+
+plot(Th, uErrorAbs, fill=true, dim = 3);
+
+/* Error in L2 norm calculation*/
+real uErorL2Norm = sqrt( int2d(Th)(uErrorAbs^2));
+real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
+real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
+
+
+
+cout << "size of mesh = " << h[].max << endl;
+cout << "||uExact||_L2 " << uExactL2Norm << endl;
+cout << "||uEror||_L2 " << uErorL2Norm << endl;
+cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl;
