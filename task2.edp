@@ -8,7 +8,16 @@ real xMidLeft = -5.0;
 real xMidRight = 5;
 real xMid = 0;
 real yMid = 0;
-
+/* y = a*x^2 + b*x + c */
+real a = 0.48;
+real b = 2.4;
+real c = 5;
+/* y = kx + d */
+real k = 1;
+real d = 10;
+/* x^2/q^2 + y^2/z^2 = 1 */
+real q = 11;
+real z = 8;
 
 int LabelIn = 1;
 int LabelOut = 2;
@@ -20,55 +29,55 @@ int Nout = Nin * 8;
 
 border GammaLT1( t = 0.0, 1) {
     x = xMin + (xMidLeft - xMin) * t;
-    y = x + 10;
+    y = k*x + d;
     label = LabelIn;
 }
 
 border GammaLT2( t = 0.0, 1) {
     x = xMidLeft + (xMid - xMidLeft) * t;
-    y = 0.48 * x^2 + 2.4 * x + 5;
+    y = a* x^2 + b * x + c;
     label = LabelIn;
 }
 
 border GammaRT1( t = 0.0, 1) {
     x = xMid +(xMidRight - xMid) * t;
-    y = 0.48 * x^2 - 2.4 * x + 5;
+    y = a * x^2 - b * x + c;
     label = LabelIn;
 }
 
 border GammaRT2( t = 0.0, 1) {
     x = xMidRight +(xMax - xMidRight) * t;
-    y = 10 - x;
+    y = d - k*x;
     label = LabelIn;
 }
 
 border GammaLB1( t = 0.0, 1) {
     x = xMidLeft +(xMin - xMidLeft) * t;
-    y = -x - 10;
+    y = -k * x - d;
     label = LabelIn;
 }
 
 border GammaLB2( t = 0.0, 1) {
     x = xMid + (xMidLeft - xMid) * t;
-    y = -0.48 * x^2 - 2.4 * x - 5;
+    y = -a * x^2 - b * x - c;
     label = LabelIn;
 }
 
 border GammaRB1( t = 0.0, 1) {
     x = xMidRight + (xMid - xMidRight) * t;
-    y = -0.48 * x^2 + 2.4 * x - 5;
+    y = -a * x^2 + b * x - c;
     label = LabelIn;
 }
 
 border GammaRB2( t = 0.0, 1) {
     x = xMax + (xMidRight - xMax) * t;
-    y = x - 10;
+    y = k*x - d;
     label = LabelIn;
 }
 
 border GammaOut( t = 0.0, 2*pi) {
-    x = 11 * cos(t);
-    y = 8 * sin(t);
+    x = q * cos(t);
+    y = z * sin(t);
     label = LabelOut;
 }
 
@@ -88,6 +97,21 @@ func f = w*w*(1 + 4*y^2) * sin(w*(x + y^2)) - 2 * w* cos(w*(x + y^2));
 func ux1 = w*cos(w*(x + y^2));
 func uy1 = 2 * y * w * cos(w*(x + y^2));
 
+func real[int,int] segmentDivision(real[int] startPoint, real[int] endPoint, int numSegments)
+{
+    real[int,int] coords(numSegments, 2);
+    real hx = (endPoint[0] - startPoint[0]) / (numSegments - 1);
+    real hy = (endPoint[1] - startPoint[1]) / (numSegments - 1);
+    for (int i = 0; i < numSegments; i++)
+    {
+        coords(i,0) = startPoint[0] + hx * i;
+        coords(i,1) = startPoint[1] + hy * i;
+    }
+    return coords;
+}
+real[int] startPoint = [0.,0.];
+real[int] endPoint = [1.,1.];
+cout << segmentDivision(startPoint,endPoint,10) << endl;
 
 Vh u,v;
 Vh uExact = uExactFunc; 
@@ -114,14 +138,23 @@ varf RhsLinearForm(u,v) =
     ;
 
 matrix A = PoissonBilinearForm(Vh, Vh);
-real[int] b = RhsLinearForm(0, Vh);
+real[int] B = RhsLinearForm(0, Vh);
 
-u[] = A^-1 * b; 
+u[] = A^-1 * B; 
 
 Vh uErrorAbs = abs(u - uExact);
 
+/* Error in L2 norm calculation*/
+real uErorL2Norm = sqrt( int2d(Th)((uErrorAbs)^2));
+/*  L2 norm u*/
+real uL2Norm = sqrt( int2d(Th)((u)^2));
+/*  L2 norm uExact */
+real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
+/*  Relative uError */
+real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
+
 real error = 0.001;
-real nvertices = 200000;
+real nvertices = 500000;
 real hMin = 0.0001;
 real hMax = 0.1;
 
@@ -142,19 +175,17 @@ for(int i = 0; i < 6 ; i++){
     uExact = uExactFunc;
     uErrorAbs = abs(u - uExact);
     matrix A = PoissonBilinearForm(Vh, Vh);
-    real[int] b = RhsLinearForm(0, Vh); 
-    u[] = A^-1 * b; 
+    real[int] B = RhsLinearForm(0, Vh); 
+    u[] = A^-1 * B; 
     error = error/2;
+
     string plotTitle = "Poisson Solution " + i;
     plot(Th, u, fill = 0 , dim = 2, wait = 1, value = 1, nbiso = 30,cmm = plotTitle);
-    /* Error in L2 norm calculation*/
-    real uErorL2Norm = sqrt( int2d(Th)((uErrorAbs)^2));
-    /*  L2 norm u*/
-    real uL2Norm = sqrt( int2d(Th)((u)^2));
-    /*  L2 norm uExact */
-    real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
-    /*  Relative uError */
-    real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
+    
+    uErorL2Norm = sqrt( int2d(Th)((uErrorAbs)^2));
+    uL2Norm = sqrt( int2d(Th)((u)^2));
+    uExactL2Norm = sqrt( int2d(Th)(uExact^2));
+    uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
     cout<<" ======= parametrs, when we know uExact ======="<< endl;
     cout << "||uEror||_L2 " << uErorL2Norm << endl;
     cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl;
