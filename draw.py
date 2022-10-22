@@ -1,0 +1,25 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+nAdaptation = 6
+nDots = 100
+dat = []
+for i in range(nAdaptation):
+    with open(r"C:\Users\Кирилл\Desktop\freefem_test\DATA\adaptation " + str(i) +" .txt") as f:
+        for line in f:
+            dat.append([float(x) for x in line.split()])
+dat = np.array(dat, dtype=float)
+
+
+
+fig = plt.figure(figsize=(15, 6))
+plt.rcParams['font.size'] = '18'
+
+ax_1 = fig.add_subplot(1, 1, 1)
+fig.subplots_adjust(wspace=0.4, hspace=0.6, left=0.065, right=0.835, top=0.915, bottom=0.125)
+for i in range(nAdaptation):
+    ax_1.plot(dat[nDots * i:nDots * (i + 1), 0], dat[nDots * i:nDots * (i + 1), 1], label="adaptation" + str(i))
+ax_1.set(xlabel='s')
+ax_1.set(ylabel='u(x(s),y(s))')
+ax_1.legend()
+plt.show()

@@ -1,13 +1,10 @@
 
 real xMin = -10.0;
 real xMax = 10.0;
-real yMin = -5.0;
-real yMax = 5.0;
 
 real xMidLeft = -5.0;
 real xMidRight = 5;
 real xMid = 0;
-real yMid = 0;
 /* y = a*x^2 + b*x + c */
 real a = 0.48;
 real b = 2.4;
@@ -97,21 +94,18 @@ func f = w*w*(1 + 4*y^2) * sin(w*(x + y^2)) - 2 * w* cos(w*(x + y^2));
 func ux1 = w*cos(w*(x + y^2));
 func uy1 = 2 * y * w * cos(w*(x + y^2));
 
-func real[int,int] segmentDivision(real[int] startPoint, real[int] endPoint, int numSegments)
+func real[int] segmentDivision(real[int] startPoint, real[int] endPoint, real parametr)
 {
-    real[int,int] coords(numSegments, 2);
-    real hx = (endPoint[0] - startPoint[0]) / (numSegments - 1);
-    real hy = (endPoint[1] - startPoint[1]) / (numSegments - 1);
-    for (int i = 0; i < numSegments; i++)
-    {
-        coords(i,0) = startPoint[0] + hx * i;
-        coords(i,1) = startPoint[1] + hy * i;
-    }
+    real[int] coords(2);
+    real length = sqrt((endPoint[0] - startPoint[0])^2 + (endPoint[1] - startPoint[1])^2);
+    real hx = (endPoint[0] - startPoint[0]) / length;
+    real hy = (endPoint[1] - startPoint[1]) / length;
+    coords = [startPoint[0] + hx * parametr,startPoint[1] + hy * parametr] ;
     return coords;
 }
 real[int] startPoint = [0.,0.];
-real[int] endPoint = [1.,1.];
-cout << segmentDivision(startPoint,endPoint,10) << endl;
+real[int] endPoint = [1.,0.];
+cout << segmentDivision(startPoint,endPoint,0.6) << endl;
 
 Vh u,v;
 Vh uExact = uExactFunc; 
@@ -154,9 +148,10 @@ real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
 real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
 
 real error = 0.001;
-real nvertices = 500000;
+real nvertices = 200000;
 real hMin = 0.0001;
 real hMax = 0.1;
+
 
 for(int i = 0; i < 6 ; i++){
 
@@ -180,8 +175,7 @@ for(int i = 0; i < 6 ; i++){
     error = error/2;
 
     string plotTitle = "Poisson Solution " + i;
-    plot(Th, u, fill = 0 , dim = 2, wait = 1, value = 1, nbiso = 30,cmm = plotTitle);
-    
+    plot(Th, u, fill = 1 , dim = 2, wait = 1, value = 1, nbiso = 30,cmm = plotTitle);
     uErorL2Norm = sqrt( int2d(Th)((uErrorAbs)^2));
     uL2Norm = sqrt( int2d(Th)((u)^2));
     uExactL2Norm = sqrt( int2d(Th)(uExact^2));
@@ -189,6 +183,21 @@ for(int i = 0; i < 6 ; i++){
     cout<<" ======= parametrs, when we know uExact ======="<< endl;
     cout << "||uEror||_L2 " << uErorL2Norm << endl;
     cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl;
+
+    {
+    ofstream file("DATA/adaptation " + i +" .txt");
+    real[int] startPoint = [0.,-8.];
+    real[int] endPoint = [0.,-6.];
+    real length = sqrt((endPoint[0] - startPoint[0])^2 + (endPoint[1] - startPoint[1])^2);
+    int noumberSplit = 100;
+    real step = length / (noumberSplit - 1);
+    for (int j = 0; j*step <= length; j++)
+    {
+        real[int] dot = segmentDivision(startPoint,endPoint,j*step);
+        cout << dot<<endl<<endl;
+        file << j*step << "\t" << u(dot[0], dot[1]) << endl;
+    }
+    }
 }
 
 
