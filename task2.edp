@@ -1,3 +1,5 @@
+system("mkdir DATA");
+
 real xMin = -10.0;
 real xMax = 10.0;
 
@@ -15,8 +17,11 @@ real d = 10;
 real q = 11;
 real z = 8;
 
+
 int LabelIn = 1;
 int LabelOut = 2;
+/* label for output */
+int LabelDisplay = LabelIn;
 
 
 int Nin = 3 * 32; 
@@ -135,12 +140,12 @@ plot(Th, u, fill = 0 , dim = 2, wait = 1, value = 1, nbiso = 10,cmm = "Without a
 /* edge center coordinates for inner boundary */
 for (int i=0; i < Th.nbe; i++)
 {
-    if (Th.be(i).label == LabelIn)
+    if (Th.be(i).label == LabelDisplay)
     {
-            cout << "x centre = " << (Th(Th.be(i)[0]).x + Th(Th.be(i)[1]).x) / 2. <<
-            "\ty centre = " << (Th(Th.be(i)[0]).y + Th(Th.be(i)[1]).y) / 2. <<
-            "\tu(x centre, y centre) = " << 
-            u((Th(Th.be(i)[0]).x + Th(Th.be(i)[1]).x) / 2., (Th(Th.be(i)[0]).y + Th(Th.be(i)[1]).y) / 2.) << endl;
+        real xCentre = (Th(Th.be(i)[0]).x + Th(Th.be(i)[1]).x) / 2.;
+        real yCentre = (Th(Th.be(i)[0]).x + Th(Th.be(i)[1]).x) / 2.;
+        cout << "x centre = " << xCentre << "\ty centre = " << yCentre <<
+        "\tu(x centre, y centre) = " << u(xCentre, yCentre) << endl;
     }
 };
 
@@ -160,6 +165,7 @@ cout<<" ======= parametrs without adaptation ======="<< endl;
 
 {
     ofstream file("DATA/No adaptation.txt");
+    ofstream file1("DATA/Exact.txt");
     real[int] startPoint = [0.,-8.];
     real[int] endPoint = [0.,-6.];
     real length = sqrt((endPoint[0] - startPoint[0])^2 + (endPoint[1] - startPoint[1])^2);
@@ -169,8 +175,10 @@ cout<<" ======= parametrs without adaptation ======="<< endl;
     {
         real[int] dot = segmentDivision(startPoint,endPoint,j*step);
         file << j*step << "\t" << u(dot[0], dot[1]) << endl;
+        file1 << j*step << "\t" << uExact(dot[0], dot[1]) << endl;
     }
 }
+
 
 real error = 0.01;
 real nvertices = 200000;
