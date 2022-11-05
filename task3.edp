@@ -1,0 +1,197 @@
+load "MUMPS_seq"
+
+real epsilon = 0.0001;
+int maxIter = 1000000;
+
+matrix AA = [[2, 1, 0, 1],
+            [0, 1, 0, 1],
+            [0, 3, -5, 0],
+            [0, 0, 1, 1]];
+real[int] rhs = [5, 3, -7, 7];
+
+real[int] exactSolution = [1, -6.5, -2.5, 9.5];
+
+func real[int] BicGStub(matrix& A, real[int]& rhs){
+    int size = rhs.n;
+
+    real[int] x0(size);
+    x0 = 1.0;
+
+    real[int] multAx0 = A * x0;
+    real[int] r0 = rhs - multAx0;
+
+    real[int] r = r0;
+
+    real[int] p0 = r0;
+
+    int k = 0;
+    while (k < maxIter)
+    {
+        real[int] temp = A * p0;
+        real alphak = (r0' * r) / (temp' * r);
+
+        real[int] sk = r0 - alphak * temp;
+
+        real[int] temp2 = A * sk;
+        real omegak = (temp2' * sk) / (temp2' * temp2);
+
+        real[int] temp3 = alphak * p0 + omegak * sk;
+        real[int] xk = x0 + temp3;
+
+        real[int] rk = sk - omegak * temp2;
+
+        if (sqrt(rk' * rk) < epsilon) {
+            return xk;
+        }
+
+        real betak = alphak / omegak * (rk' * r) / (r0' * r);
+
+        real[int] temp4 = p0 - omegak * temp;
+        real[int] pk = rk + betak * temp4;
+
+        x0 = xk;
+        r0 = rk;
+        p0 = pk;
+        cout << "iteration number = " << k << endl;
+        k++;
+    }
+    return x0;   
+}
+
+/* if 1 then the solutions are the same, 0 if they are different  */
+real eps = 1e-4;
+func bool checkSolution (real[int]& exact, real[int]& numeric){
+    bool similarity = true;
+    for (int i = 0; i < exact.n; i++){
+        if (abs(exact[i] - numeric[i]) > eps )
+        {
+            similarity = false;
+        }
+
+    }
+    return similarity;
+}
+real[int] solution = BicGStub(AA, rhs);
+cout << solution << endl;
+cout << checkSolution(exactSolution, solution) << endl;
+
+
+/* domain geometry */
+real ROut = 10.0;
+real RIn = 0.5*ROut;
+/* Boundary conditions*/
+real uOut = 1.0;
+real uIn = 2.0;
+/* mesh defenition*/
+int NN = 50*4;
+int Nout = NN;
+int NIn = int(RIn / ROut * NN);
+
+int labelIn = 1; /* label of inner circle */
+int labelOut = 2; /* label of outer circle */
+
+/* Inner circle border definition */
+
+border GammaIn(t = 0.0, 2.0*pi){
+    x = RIn * cos(t);
+    y = RIn * sin(t);
+    label = labelIn;
+};
+
+border GammaOut(t = 0.0, 2.0*pi){
+    x = ROut * cos(t);
+    y = ROut * sin(t);
+    label = labelOut;
+};
+
+plot( GammaIn(NIn) + GammaOut(Nout));
+
+mesh Th = buildmesh( GammaIn(-NIn) + GammaOut(Nout) );
+
+plot(Th);
+
+/* Finite element space defenition  */
+
+fespace Vh(Th, P1); /* P1 кусочно линейные */
+
+Vh u,v, ubicgstub;
+
+/* Bilinear form defenition for matrix */
+/* int2d -интеграл по двумерной области */
+
+varf LaplaceBilinearForm (u,v) = 
+    int2d(Th)(
+        dx(u)*dx(v) + dy(u)*dy(v)
+    )
+    + on(labelIn, u = uIn)
+    + on(labelOut, u = uOut)
+    ;
+
+/* Linear form defenition for rhs */
+/* rhs - правая часть уравнения  */
+
+varf RhsLinearForm(u,v) = 
+    on(labelIn, u = uIn)
+    + on(labelOut, u = uOut);
+
+real ttgv = 1e30;
+matrix A = LaplaceBilinearForm(Vh, Vh, tgv=ttgv);
+real[int] b = RhsLinearForm(0, Vh, tgv = ttgv);
+
+set(A, 
+    solver=sparsesolver, 
+    tgv= ttgv,
+    eps = 1e-10,
+    strategy=1
+    );
+
+u[] = A^-1*b; /* решение СЛАУ */
+/* real[int] ubicgstub1 = BicGStub(A, b);
+
+ubicgstub[]=ubicgstub1; */
+
+/* Exact solution*/
+real C1 = (uOut - uIn) / log (ROut / RIn);
+real C2 = uOut - C1*log(ROut);
+
+func uExactFunc = 0.5 * C1 * log (x*x + y*y) + C2 ;
+
+Vh uExact = uExactFunc; 
+Vh uErrorAbs = abs(u - uExact);
+Vh uErrorAbs2 = abs(ubicgstub - uExact);
+
+string plotTitle3 = "error MUMPS";
+plot(Th, uErrorAbs, fill=true, dim = 2,value = 1, cmm = plotTitle3);
+
+string plotTitle4 = "error BicGStub";
+plot(Th, uErrorAbs2, fill=true, dim = 2,value = 1, cmm = plotTitle4);
+
+/* Error in L2 norm calculation*/
+real uErorL2Norm = sqrt( int2d(Th)(uErrorAbs^2));
+real uErorL2NormBicGStub = sqrt( int2d(Th)(uErrorAbs2^2));
+real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
+real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
+/* real uErrorRelL2NormBicGStub = uErorL2NormBicGStub / uExactL2Norm; */
+
+
+cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl;
+/* cout << "||uErorRelBicGStub||_L2 " << uErrorRelL2NormBicGStub << endl; */
+
+string plotTitle = "Laplace Solution";
+
+plot (Th, u, fill = true, dim = 2, value = 1, nbiso = 10, cmm = plotTitle);
+
+string plotTitle1 = "Laplace Solution with BicGStub";
+
+plot (Th, ubicgstub, fill = true, dim = 2, value = 1, nbiso = 10, cmm = plotTitle1);
+
+/* Error in L2 norm calculation*/
+/* real uErorL2Norm = sqrt( int2d(Th)(uErrorAbs^2));
+real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
+real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
+
+cout << "||uExact||_L2 " << uExactL2Norm << endl;
+cout << "||uEror||_L2 " << uErorL2Norm << endl;
+cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl; */
+
+
