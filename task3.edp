@@ -134,7 +134,7 @@ varf RhsLinearForm(u,v) =
     on(labelIn, u = uIn)
     + on(labelOut, u = uOut);
 
-real ttgv = 1e30;
+real ttgv = 1e10;
 matrix A = LaplaceBilinearForm(Vh, Vh, tgv=ttgv);
 real[int] b = RhsLinearForm(0, Vh, tgv = ttgv);
 
@@ -171,11 +171,11 @@ real uErorL2Norm = sqrt( int2d(Th)(uErrorAbs^2));
 real uErorL2NormBicGStub = sqrt( int2d(Th)(uErrorAbs2^2));
 real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
 real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
-/* real uErrorRelL2NormBicGStub = uErorL2NormBicGStub / uExactL2Norm; */
+real uErrorRelL2NormBicGStub = uErorL2NormBicGStub / uExactL2Norm;
 
 
 cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl;
-/* cout << "||uErorRelBicGStub||_L2 " << uErrorRelL2NormBicGStub << endl; */
+cout << "||uErorRelBicGStub||_L2 " << uErrorRelL2NormBicGStub << endl;
 
 string plotTitle = "Laplace Solution";
 
@@ -185,13 +185,13 @@ string plotTitle1 = "Laplace Solution with BicGStub";
 
 plot (Th, ubicgstub, fill = true, dim = 2, value = 1, nbiso = 10, cmm = plotTitle1);
 
-/* Error in L2 norm calculation*/
-/* real uErorL2Norm = sqrt( int2d(Th)(uErrorAbs^2));
+/*  Error in L2 norm calculation */
+real uErorL2Norm = sqrt( int2d(Th)(uErrorAbs^2));
 real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
 real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
 
 cout << "||uExact||_L2 " << uExactL2Norm << endl;
 cout << "||uEror||_L2 " << uErorL2Norm << endl;
-cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl; */
+cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl; 
 
 
