@@ -1,0 +1,159 @@
+load "MUMPS_seq" 
+/* BiCGStab function */
+func real[int] BiCGStab (matrix& A, real[int]& rhs, int maxIter, real eps){
+    /* Preparation before the iterative process */ 
+    int k = 0;
+    real[int] xkPrev(rhs.n);
+    real[int] rkPrev =  A * xkPrev;
+    rkPrev = rhs - rkPrev ;
+    real[int] rv = rkPrev;
+    real rokPrev = 1;
+    real alfkPrev = 1;
+    real omegkPrev = 1;
+    real[int] vkPrev(rhs.n);
+    real[int] pkPrev(rhs.n);
+    real rhsNorm = sqrt(rhs' * rhs); 
+    real rkNorm = 1e100;
+    real[int] xk(rhs.n);
+    /* Iterate loop */
+    while ( (k < maxIter) && ( rkNorm / rhsNorm > eps) ){
+        real rok = rv' * rkPrev; 
+
+        real bettak = rok / rokPrev * alfkPrev / omegkPrev;
+
+        real[int] pk = omegkPrev * vkPrev;
+        pk = pkPrev - pk;
+        pk =  bettak * pk; 
+        pk = rkPrev + pk;
+
+        real[int] vk = A * pk;
+
+        real alfk = rok / ( rv' * vk );
+
+        real [int] sk = rkPrev - alfk * vk;
+
+        real[int] tk = A * sk;
+
+        real omegk = ( tk' * sk ) / ( tk' * tk );
+
+        xk = omegk * sk;
+        real[int] temp = alfk * pk;
+        xk = xk + temp;
+        xk = xkPrev + xk;
+
+        real[int] rk = omegk * tk;
+        rk = sk - rk;
+
+        rkNorm = sqrt(rk' * rk);
+        rkPrev = rk;
+        rokPrev = rok;
+        alfkPrev = alfk;
+        omegkPrev = omegk;
+        xkPrev = xk;
+
+        k ++ ;
+    }
+    
+    return xk;
+}
+ /* Test function */
+func bool Test ( real[int]& numSol, real[int]& exactSol, real errExpect ){
+    real[int] temp = numSol- exactSol ; 
+    real err ;
+    for (int i = 0; i < exactSol.n - 1; i++ ){
+        err = max ( abs(temp[i]), abs(temp[i+1]));
+    }
+    return (err < errExpect);
+}
+/* Main */
+matrix AA =[ [1, 2, 0, 0], [ 0, 6, 0, 0], [0, 4, -7, 0], [0, 0, 3, 3] ];
+real[int] rhs = [5, 12, -13, 21];
+real[int] exactSol = [1, 2, 3, 4];
+int maxIter = 1000000;
+real eps = 1e-100;
+real errExpect = 0.01;
+
+real[int] numSol = BiCGStab (AA, rhs, maxIter, eps);
+cout << endl << numSol << endl << endl;
+
+bool success = Test(numSol, exactSol, errExpect);
+cout << endl << " success = " << success << endl << endl;
+
+/* ///////////////////////////////////////    the second part of the task    /////////////////////////////////////// */ 
+
+/* Domain geometry*/
+real ROut = 10.0; /* Radius of outer circle */
+real RIn = 0.5*ROut; /* Radius of inner circle*/
+
+/* Boundary conditions */
+real uOut =1.0;
+real uIn =2.0;
+
+/* Mesh definition*/
+int NN = 50*2;
+int NOut = NN;
+int NIn = int(RIn / ROut*NN);
+
+int labelIn = 1; /* Label of inner circle */
+int labelOut = 2; /* Label of outer cicle */ 
+
+/* Border definition */
+border GammaIn( t = 0.0, 2.0*pi){
+    x = RIn*cos(t);
+    y = RIn*sin(t);
+    label = labelIn;
+};
+border GammaOut( t = 0.0, 2.0*pi){
+    x = ROut*cos(t);
+    y = ROut*sin(t);
+    label = labelOut;
+};
+
+mesh Th = buildmesh( GammaIn(-NIn) + GammaOut(NOut)) ;
+
+/* Finite elemet space defenition */
+fespace Vh(Th, P1);
+Vh u,v;
+
+/* bilinear form definition for matrix */ 
+varf LaplaceBilinearForm(u,v) =
+    int2d(Th)(
+        dx(u)*dx(v)+dy(u)*dy(v)
+    )
+    + on(labelIn, u=uIn)
+    + on(labelOut, u=uOut)
+    ;
+
+/* Linear form definition for rhs(right hand side) */
+varf RhsLinearForm(u,v) = 
+    on(labelIn, u=uIn)
+    +on(labelOut, u=uOut)
+;
+
+matrix A = LaplaceBilinearForm(Vh,Vh);
+real[int] b = RhsLinearForm(0, Vh);
+
+
+real ttgv= -1;
+
+set(A,  
+    tgv = ttgv,
+    eps = 1e-2,
+    strategy=1
+    );
+
+
+real[int] uMy = BiCGStab (A, b, maxIter, eps);
+
+/* u[] - the vector of unknowns */
+u[] = A^-1*b; /* SLAE solution */
+
+/* Exact solution */
+real C1 = ( uOut - uIn ) / log(ROut/RIn);
+real C2 = uOut - C1*log(ROut);
+
+func uExactFunc = 0.5*C1*log(x*x+y*y) + C2;
+
+Vh uExact = uExactFunc; /* Project exact solution on fespace */
+
+Vh uErrorAbs = abs(u-uExact);
