@@ -1,0 +1,242 @@
+system("mkdir DATA");
+
+real xMin = -10.0;
+real xMax = 10.0;
+
+real xMidLeft = -5.0;
+real xMidRight = 5;
+real xMid = 0;
+/* y = a*x^2 + b*x + c */
+real a = 0.48;
+real b = 2.4;
+real c = 5;
+/* y = kx + d */
+real k = 1;
+real d = 10;
+/* x^2/q^2 + y^2/z^2 = 1 */
+real q = 11;
+real z = 8;
+
+
+int LabelIn = 1;
+int LabelOut = 2;
+/* label for output */
+int LabelDisplay = LabelIn;
+
+
+int Nin = 3 * 32; 
+int Nout = Nin * 8;
+
+
+border GammaLT1( t = 0.0, 1) {
+    x = xMin + (xMidLeft - xMin) * t;
+    y = k*x + d;
+    label = LabelIn;
+}
+
+border GammaLT2( t = 0.0, 1) {
+    x = xMidLeft + (xMid - xMidLeft) * t;
+    y = a* x^2 + b * x + c;
+    label = LabelIn;
+}
+
+border GammaRT1( t = 0.0, 1) {
+    x = xMid +(xMidRight - xMid) * t;
+    y = a * x^2 - b * x + c;
+    label = LabelIn;
+}
+
+border GammaRT2( t = 0.0, 1) {
+    x = xMidRight +(xMax - xMidRight) * t;
+    y = d - k*x;
+    label = LabelIn;
+}
+
+border GammaLB1( t = 0.0, 1) {
+    x = xMidLeft +(xMin - xMidLeft) * t;
+    y = -k * x - d;
+    label = LabelIn;
+}
+
+border GammaLB2( t = 0.0, 1) {
+    x = xMid + (xMidLeft - xMid) * t;
+    y = -a * x^2 - b * x - c;
+    label = LabelIn;
+}
+
+border GammaRB1( t = 0.0, 1) {
+    x = xMidRight + (xMid - xMidRight) * t;
+    y = -a * x^2 + b * x - c;
+    label = LabelIn;
+}
+
+border GammaRB2( t = 0.0, 1) {
+    x = xMax + (xMidRight - xMax) * t;
+    y = k*x - d;
+    label = LabelIn;
+}
+
+border GammaOut( t = 0.0, 2*pi) {
+    x = q * cos(t);
+    y = z * sin(t);
+    label = LabelOut;
+}
+
+mesh Th = buildmesh(GammaLT1(Nin) + GammaLT2(Nin) + GammaRT1(Nin) + GammaRT2(Nin) +
+                    GammaLB1(Nin) + GammaLB2(Nin) + GammaRB1(Nin) + GammaRB2(Nin) +
+                    GammaOut(Nout));
+
+/*  plot(Th); */
+
+
+fespace Vh(Th, P1); 
+
+real w = 0.1;
+func uExactFunc = sin(w*(x + y^2));
+func f = w*w*(1 + 4*y^2) * sin(w*(x + y^2)) - 2 * w * cos(w*(x + y^2));
+func ux1 = w*cos(w*(x + y^2));
+func uy1 = 2 * y * w * cos(w*(x + y^2));
+
+/* conversion from parameter to coordinates */
+func real[int] segmentDivision(real[int] startPoint, real[int] endPoint, real parametr)
+{
+    real[int] coords(2);
+    real length = sqrt((endPoint[0] - startPoint[0])^2 + (endPoint[1] - startPoint[1])^2);
+    real hx = (endPoint[0] - startPoint[0]) / length;
+    real hy = (endPoint[1] - startPoint[1]) / length;
+    coords = [startPoint[0] + hx * parametr,startPoint[1] + hy * parametr] ;
+    return coords;
+}
+
+
+Vh u,v;
+Vh uExact = uExactFunc; 
+Vh ff = f;
+Vh ux = ux1;
+Vh uy = uy1;
+Vh h = hTriangle;
+verbosity = 0;
+
+
+varf PoissonBilinearForm (u,v) = 
+    int2d(Th)(
+        dx(u) * dx(v) + dy(u) * dy(v)
+    )
+    + on(LabelIn, u = uExact)
+    ;
+
+/* Linear form defenition for rhs */
+varf RhsLinearForm(u,v) = 
+    int1d(Th, LabelOut)( (ux * N.x + uy * N.y) * v)
+    + int2d(Th)(ff * v )
+    + on(LabelIn, u = uExact)
+    ;
+
+matrix A = PoissonBilinearForm(Vh, Vh);
+real[int] B = RhsLinearForm(0, Vh);
+
+u[] = A^-1 * B;
+plot(Th, u, fill = 0 , dim = 2, wait = 1, value = 1, nbiso = 10,cmm = "Without adaptation"); 
+/* edge center coordinates for inner boundary */
+for (int i=0; i < Th.nbe; i++)
+{
+    if (Th.be(i).label == LabelDisplay)
+    {
+        real xCentre = (Th(Th.be(i)[0]).x + Th(Th.be(i)[1]).x) / 2.;
+        real yCentre = (Th(Th.be(i)[0]).x + Th(Th.be(i)[1]).x) / 2.;
+        cout << "x centre = " << xCentre << "\ty centre = " << yCentre <<
+        "\tu(x centre, y centre) = " << u(xCentre, yCentre) << endl;
+    }
+};
+
+Vh uErrorAbs = abs(u - uExact);
+
+/* Error in L2 norm calculation*/
+real uErorL2Norm = sqrt( int2d(Th)((uErrorAbs)^2));
+/*  L2 norm u*/
+real uL2Norm = sqrt( int2d(Th)((u)^2));
+/*  L2 norm uExact */
+real uExactL2Norm = sqrt( int2d(Th)(uExact^2));
+/*  Relative uError */
+real uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
+cout<<" ======= parametrs without adaptation ======="<< endl;
+    cout << "||uEror||_L2 " << uErorL2Norm << endl;
+    cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl;
+
+{
+    ofstream file("DATA/No adaptation.txt");
+    ofstream file1("DATA/Exact.txt");
+    real[int] startPoint = [0.,-8.];
+    real[int] endPoint = [0.,-6.];
+    real length = sqrt((endPoint[0] - startPoint[0])^2 + (endPoint[1] - startPoint[1])^2);
+    int noumberSplit = 100;
+    real step = length / (noumberSplit - 1);
+    for (int j = 0; j*step <= length; j++)
+    {
+        real[int] dot = segmentDivision(startPoint,endPoint,j*step);
+        file << j*step << "\t" << u(dot[0], dot[1]) << endl;
+        file1 << j*step << "\t" << uExact(dot[0], dot[1]) << endl;
+    }
+}
+
+
+real error = 0.01;
+real nvertices = 200000;
+real hMin = 0.0001;
+real hMax = 0.1;
+
+
+for(int i = 1; i < 7 ; i++){
+
+    Th = adaptmesh( Th,u, 
+            err = error, /* Interpolation P1 error */
+            nbvx = nvertices, /* MAx vertices noumber */
+            hmin = hMin, /* min edge size */
+            hmax = hMax, /* max rdge size */
+            iso = true /* is metric isotropic? */
+    );
+    v = v;
+    u = u;
+    ff = f;
+    ux = ux1;
+    uy = uy1;
+    uExact = uExactFunc;
+    uErrorAbs = abs(u - uExact);
+    matrix A = PoissonBilinearForm(Vh, Vh);
+    real[int] B = RhsLinearForm(0, Vh); 
+    u[] = A^-1 * B; 
+    error = error/2;
+
+    string plotTitle = "Poisson Solution " + i;
+    plot(Th, u, fill = 0 , dim = 2, wait = 1, value = 1, nbiso = 10,cmm = plotTitle);
+    uErorL2Norm = sqrt( int2d(Th)((uErrorAbs)^2));
+    uL2Norm = sqrt( int2d(Th)((u)^2));
+    uExactL2Norm = sqrt( int2d(Th)(uExact^2));
+    uErrorRelL2Norm = uErorL2Norm / uExactL2Norm;
+    cout<<" ======= parametrs, adaptation " + i +" ======="<< endl;
+    cout << "||uEror||_L2 " << uErorL2Norm << endl;
+    cout << "||uErorRel||_L2 " << uErrorRelL2Norm << endl;
+
+    {
+    ofstream file("DATA/adaptation " + i +" .txt");
+    real[int] startPoint = [0.,-8.];
+    real[int] endPoint = [0.,-6.];
+    real length = sqrt((endPoint[0] - startPoint[0])^2 + (endPoint[1] - startPoint[1])^2);
+    int noumberSplit = 100;
+    real step = length / (noumberSplit - 1);
+    for (int j = 0; j*step <= length; j++)
+    {
+        real[int] dot = segmentDivision(startPoint,endPoint,j*step);
+        file << j*step << "\t" << u(dot[0], dot[1]) << endl;
+    }
+    }
+}
+
+
+
+
+
+
+
+
+
