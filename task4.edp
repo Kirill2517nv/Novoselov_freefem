@@ -1,0 +1,132 @@
+/* Domain geometry */
+load "iovtk"
+system("mkdir .\\SolNS\\");
+
+real H = 3; /* [m] height of the tube */
+real RIn = 0.5; /* [m] radius of the obstacle */
+real L = 10; /* [m] length of the tube */
+
+/* phisical parametrs */
+real mu = 1e-3; /* [Pa*s], dynamic viscosity */
+real rho = 1e3; /* [kg/m^3], density */
+real U0 = 5; /* [m/s], start speed */
+real p0 = 1e5; /* [Pa] pressure outlet*/
+real epsilon = 0.05;
+real t = 0;
+real dt = 0.1;
+
+func real uin (real t) {
+    return U0 + epsilon * sin(t) * cos (y / H); 
+    }   /* [m/s], velocity profile */
+
+/* Mesh defenition */
+
+int n = 100;
+real[int] xP = [0, L, L, 0];
+real[int] yP = [0, 0, H, H];
+
+int[int] nGamma = [L/L, H/L, L/L, H/L] * n;
+
+int labelInlet = 1;
+int labelWall = 2;
+int labelObstacle = 3;
+int labelOuylet = 4;
+
+int[int] labelGamma = [labelWall, labelOuylet, labelWall, labelInlet];
+
+/* backward step boundary */
+border GammaDomain (t=0.0, 1.0; i)
+{
+    int ii = (i+1) % nGamma.n;
+    x= xP[i]*(1-t) + xP[ii]*t;
+    y= yP[i]*(1-t) + yP[ii]*t;
+    label = labelGamma[i];
+}
+
+border GammaObstacle(t = 0.0, 2.0*pi){
+    x = L/3 + RIn * cos(t);
+    y = H/2 + RIn * sin(t);
+    label = labelObstacle;
+};
+
+mesh Th = buildmesh(GammaDomain(nGamma) + GammaObstacle(-(n)));
+plot(Th);
+
+
+/* differential operators */
+macro grad(u) [dx(u), dy(u)] // EOM
+macro gradVec(u1,u2) [dx(u1), dy(u1), dx(u2), dy(u2)] // EOM
+macro uGradV(u1,u2,v1,v2)[
+    [u1,u2]' * grad(v1),
+    [u1,u2]' * grad(v2)
+] // EOM
+macro div(u1,u2) (dx(u1) + dy(u2)) // EOM
+
+/* finite element space defenition */
+
+fespace Vh (Th, [P2, P2, P1]);
+fespace Vh1 (Th, P1);
+fespace Vh2 (Th, P2);
+
+Vh [u, v, p];
+Vh [u1, v1, p1];
+Vh [du, dv, dp];
+Vh [psi1, psi2, q];
+Vh2 uiter, viter;
+real eps = 1e-6;
+
+
+
+real error = 0.01;
+
+int count = 0;
+
+
+[u,v,p] = [0,0,0];
+
+while (t < 10)
+{
+    
+    solve NStocks([u1, v1, p1], [psi1, psi2, q]) = 
+        int2d(Th)(
+            rho / dt * [u1, v1]' * [psi1, psi2]  +
+            + mu * (gradVec(u1,v1)'*gradVec(psi1,psi2)) 
+            - p1 * div(psi1, psi2) 
+            - q * div(u1,v1)
+            - eps * p1 * q
+        )
+        + int2d(Th)(
+            - rho / dt * [convect([u,v], -dt, u), convect([u,v], -dt, v)]' * [psi1, psi2] 
+        )
+        + int1d(Th, labelOuylet)(
+            p * psi1 - mu * dx(u) * psi1
+        )
+        + on(labelInlet, u1 = uin(t), v1 = 0)
+        + on(labelObstacle, u1 = 0, v1 = 0)
+        + on(labelWall, u1 = 0, v1 = 0)
+        + on(labelOuylet, u1 = convect([u,v], -dt, u),  v1 = 0, p1 = p0);
+
+
+  /*   plot (Th, u, dim = 2, fill = 1, value = 1, nbiso = 30, wait = 0); */
+
+    cout << "Time : " << t << endl;
+    [u, v, p] = [u1, v1, p1];
+    plot (Th, u, dim = 2, fill = 1, value = 1, nbiso = 30, wait = 0);
+    /* outputs for paraview */
+    Vh1 uP1 = u;
+    Vh1 vP1 = v;
+    int[int] order = [1,1];
+    savevtk ("./SolNS/sol" + t + ".vtu" , Th, dataname = "u v", uP1, vP1, order = order );
+
+    
+    t += dt;
+    
+    // if (count % 5 == 0){
+    //     Th = adaptmesh(
+    //         Th, [u,v], err = error, iso = true, nbvx = 100000
+    //     );
+    //    plot(Th);
+    // }
+
+    
+}
