@@ -16,8 +16,8 @@ real t = 0;
 real dt = 0.1;
 
 func real uin (real t) {
-    return U0 + epsilon * sin(t) * cos (y / H); 
-    }   /* [m/s], velocity profile */
+    return U0 + epsilon * sin(t) * cos (y / H);  /* [m/s], velocity  */
+    }   
 
 /* Mesh defenition */
 
@@ -50,8 +50,8 @@ border GammaObstacle(t = 0.0, 2.0*pi){
 };
 
 mesh Th = buildmesh(GammaDomain(nGamma) + GammaObstacle(-(n)));
-plot(Th);
-
+/* plot(Th, wait = 1);
+ */
 
 /* differential operators */
 macro grad(u) [dx(u), dy(u)] // EOM
@@ -72,21 +72,35 @@ Vh [u, v, p];
 Vh [u1, v1, p1];
 Vh [du, dv, dp];
 Vh [psi1, psi2, q];
-Vh2 uiter, viter;
 real eps = 1e-6;
-
-
-
+int nbvxx = 50000;
 real error = 0.01;
-
+real maxTime = 40;
 int count = 0;
 
 
-[u,v,p] = [0,0,0];
+/* [u,v,p] = [0,0,0]; */
 
-while (t < 10)
+solve Stocks([u, v, p], [psi1, psi2, q]) = 
+    int2d(Th)(
+        mu * (gradVec(u,v)'*gradVec(psi1,psi2) )
+        - p * div(psi1, psi2) 
+        - q*div(u,v)
+        - eps * p * q
+    )
+    + on(labelInlet, u = uin(t), v = 0)
+    + on(labelObstacle, u = 0, v = 0)
+    + on(labelWall, u = 0, v = 0)
+    + on(labelOuylet, v = 0);
+
+Vh1 uP1 = u;
+Vh1 vP1 = v;
+int[int] order = [1,1,1];
+savevtk ("./SolNS/sol" + count + ".vtu" , Th, dataname = "u v p", uP1, vP1, p, order = order );
+
+while (t < maxTime)
 {
-    
+    count++; 
     solve NStocks([u1, v1, p1], [psi1, psi2, q]) = 
         int2d(Th)(
             rho / dt * [u1, v1]' * [psi1, psi2]  +
@@ -111,22 +125,23 @@ while (t < 10)
 
     cout << "Time : " << t << endl;
     [u, v, p] = [u1, v1, p1];
-    plot (Th, u, dim = 2, fill = 1, value = 1, nbiso = 30, wait = 0);
+    /* plot (Th, u, dim = 2, fill = 1, value = 1, nbiso = 30, wait = 0); */
     /* outputs for paraview */
     Vh1 uP1 = u;
     Vh1 vP1 = v;
-    int[int] order = [1,1];
-    savevtk ("./SolNS/sol" + t + ".vtu" , Th, dataname = "u v", uP1, vP1, order = order );
+    int[int] order = [1,1,1];
+    savevtk ("./SolNS/sol" + count + ".vtu" , Th, dataname = "u v p", uP1, vP1, p, order = order );
 
     
     t += dt;
     
-    // if (count % 5 == 0){
-    //     Th = adaptmesh(
-    //         Th, [u,v], err = error, iso = true, nbvx = 100000
-    //     );
-    //    plot(Th);
-    // }
+    if (count % 5 == 0){
+        Th = adaptmesh(
+            Th, [u,v], err = error, iso = true, nbvx = nbvxx
+        );
+       plot(Th);
+    }
+    
 
     
 }
