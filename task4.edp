@@ -49,7 +49,10 @@ border GammaObstacle(t = 0.0, 2.0*pi){
     label = labelObstacle;
 };
 
+
 mesh Th = buildmesh(GammaDomain(nGamma) + GammaObstacle(-(n)));
+
+mesh Th1 = buildmesh(GammaDomain(nGamma) + GammaObstacle(-(n)));
 /* plot(Th, wait = 1);
  */
 
@@ -74,7 +77,7 @@ Vh [du, dv, dp];
 Vh [psi1, psi2, q];
 real eps = 1e-6;
 int nbvxx = 50000;
-real error = 0.01;
+real error = 0.3;
 real maxTime = 40;
 int count = 0;
 
@@ -121,11 +124,11 @@ while (t < maxTime)
         + on(labelOuylet, u1 = convect([u,v], -dt, u),  v1 = 0, p1 = p0);
 
 
-  /*   plot (Th, u, dim = 2, fill = 1, value = 1, nbiso = 30, wait = 0); */
+
 
     cout << "Time : " << t << endl;
     [u, v, p] = [u1, v1, p1];
-    /* plot (Th, u, dim = 2, fill = 1, value = 1, nbiso = 30, wait = 0); */
+    plot (Th, u, dim = 2, fill = 1, value = 1, nbiso = 30, wait = 0);
     /* outputs for paraview */
     Vh1 uP1 = u;
     Vh1 vP1 = v;
@@ -136,9 +139,13 @@ while (t < maxTime)
     t += dt;
     
     if (count % 5 == 0){
+        Th1 = Th;
+        for (int i = 0; i < 2; i++)
+        {
         Th = adaptmesh(
-            Th, [u,v], err = error, iso = true, nbvx = nbvxx
+            Th1, [u,v], err = error, iso = true, nbvx = nbvxx
         );
+        }
        plot(Th);
     }
     
